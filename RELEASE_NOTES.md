@@ -6,6 +6,10 @@ If you are reading this in the browser, then you can quickly jump to specific ve
 
 ## 6.0.0 (under development)
 
+### Parallel artifact downloads during dependency resolution
+
+Artifacts that have to be fetched while assembling a project's build target platform are now downloaded concurrently over a bounded thread pool instead of one after another. For builds that fetch many artifacts from remote p2 repositories this can noticeably reduce dependency-resolution time. The pool size is controlled by the `tycho.p2.transport.max-download-threads` system property, whose default has been raised from `4` to `8` (the previous value was not actually applied to this code path). See [System Properties](SystemProperties.md).
+
 ### new `tycho-p2-extras:p2-manager` mojo for managing P2 update sites
 
 The new `tycho-p2-extras:p2-manager` goal provides a convenient way to maintain, update, and manage the integrity of public update sites. This mojo wraps the [P2 Manager application from JustJ Tools](https://eclipse.dev/justj/?page=tools) and makes it much easier to use compared to the previous approach using the eclipse-run goal.
