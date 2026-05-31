@@ -25,6 +25,28 @@
 
 `origin/feat/parallel-artifact-prefetch` == local HEAD. No PRs opened.
 
+## Final tally (W1)
+
+**Stack:** PR1 `a4e5bb52a` (parallel artifact prefetch + default 4→8) · PR2 `6591062e8`+`e510e94ac`
+(parallel metadata load + real-manager integration test) · PR3 `5f032c4a1` (opt-in, default-off
+trust of cached qualified artifacts). On fork `joaodinissf/tycho`, branch
+`feat/parallel-artifact-prefetch`. No PRs opened.
+
+**End-to-end speedup (cold, 3 repos + 100 bundles, default config) — two methods agree:**
+| Method | today/unpatched | branch/patched | speedup |
+|---|---|---|---|
+| **Pure stamp** (unpatched pre-PR1 binary vs patched binary) | 155 s (Maven 2:22) | 64 s (Maven 1:02) | **~2.4×** |
+| **Flag isolation** (same binary, `threads=1` vs `8`) | 179 s | 68 s | **~2.6×** |
+
+**Piecewise (isolated):**
+- PR1 artifact prefetch — synthetic ~4× (8 = sweet spot, 16 no better); real single-repo 100-bundle cold 120→25 s (~4.8×).
+- PR2 metadata load — real 3-repo cold 62→20 s (~3.1×); integration test = 6 concurrent loads vs real Equinox manager, thread-safe.
+- PR3 — re-downloads 98→20 (~80% fewer) but **wall-time flat** (warm CDN ~1 s; 0.25 s/conn proxy 12 vs 11 s — keep-alive amortizes per-connection cost). Kept **opt-in, default-off** as a *bandwidth* saver, not a perf win.
+
+**Correctness:** 613 `tycho-core` tests, 0 failures; strict TDD (teeth→green→docs); real builds produce identical output. No `tycho-api`/`spi` or p2/Equinox changes; load-bearing serial points (SAT solver, slicer, Equinox resolve, ref dedup) untouched.
+
+**Honest scope:** all wins are **cold-path** (downloads). **Warm builds are unaffected** by this stack — their ~2.8 s is *re-resolution* (re-parse + SAT), which is the deferred **#5** (bigger lever, invasive). Speedups scale with network/repo conditions; single-run numbers (network variance), but both methods + large gaps make the ~2.4–2.6× direction solid.
+
 ## Steps ledger (all — done / todo / deferred)
 | Phase | # | Step | Status | Notes |
 |---|---|---|---|---|
@@ -53,7 +75,7 @@
 | PR3 | 3c | GREEN `hasQualifier` + guard in `isFileAlreadyAvailable`; opt-in flag default **off** | ✅ Done | STRICT carve-out |
 | PR3 | 3d | Docs (`SystemProperties.md`, `RELEASE_NOTES.md`) + full suite 613/0/0 | ✅ Done | |
 | PR3 | 3e | A/B: re-downloads 98→20; **wall flat** (warm CDN & 0.25s/conn proxy — keep-alive amortizes) → kept **opt-in default-off** bandwidth saver | ✅ Done | `5f032c4a1` |
-| Wrap | W1 | Final stack summary | ⏳ Todo | |
+| Wrap | W1 | Final stack summary / tally (both methods ~2.4–2.6× cold) | ✅ Done | see "Final tally" |
 | Wrap | W2 | Draft #5 upstream design proposal | ⏳ Todo (optional) | |
 | Wrap | W3 | Remove this WIP doc before opening any PR | ⏳ Todo (at completion) | |
 | Defer | #4 | Eclipse/PDE upstreaming + shared p2 loader | ⏸️ Deferred | |
