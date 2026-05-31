@@ -108,22 +108,22 @@ public class P2ResolverImpl implements P2Resolver {
             ReactorProject project) {
         P2TargetPlatform targetPlatform = getTargetFromContext(context);
 
-        // we need a linked hashmap to maintain iteration-order, some of the code relies on it!
-        Map<TargetEnvironment, P2ResolutionResult> results = new LinkedHashMap<>();
-        Set<IInstallableUnit> usedTargetPlatformUnits = new LinkedHashSet<>();
+        // the per-environment solves are independent; run them concurrently. ParallelEnvironmentResolver
+        // preserves the environment iteration order in the returned map (some of the code relies on it!).
+        Set<IInstallableUnit> usedTargetPlatformUnits = Collections.synchronizedSet(new LinkedHashSet<>());
         Set<IInstallableUnit> usedShadowedUnits = new CopyOnWriteSet<>();
-        for (TargetEnvironment environment : environments) {
-            results.put(environment,
-                    resolveDependencies(Collections.emptySet(), project, new ProjectorResolutionStrategy(logger) {
-                        @Override
-                        protected Slicer newSlicer(IQueryable<IInstallableUnit> availableUnits,
-                                Map<String, String> properties) {
-                            return super.newSlicer(
-                                    new ShadowedUnitsQueryable(targetPlatform, availableUnits, usedShadowedUnits),
-                                    properties);
-                        }
-                    }, environment, targetPlatform, usedTargetPlatformUnits));
-        }
+        Map<TargetEnvironment, P2ResolutionResult> results = ParallelEnvironmentResolver.resolve(environments,
+                environment -> resolveDependencies(Collections.emptySet(), project,
+                        new ProjectorResolutionStrategy(logger) {
+                            @Override
+                            protected Slicer newSlicer(IQueryable<IInstallableUnit> availableUnits,
+                                    Map<String, String> properties) {
+                                return super.newSlicer(
+                                        new ShadowedUnitsQueryable(targetPlatform, availableUnits, usedShadowedUnits),
+                                        properties);
+                            }
+                        }, environment, targetPlatform, usedTargetPlatformUnits),
+                ParallelEnvironmentResolver.getExecutor());
         targetPlatform.reportUsedLocalIUs(usedTargetPlatformUnits);
         for (IInstallableUnit unit : usedShadowedUnits) {
             logger.warn("Your build strictly depends on unit " + unit
@@ -145,12 +145,10 @@ public class P2ResolverImpl implements P2Resolver {
             IQueryResult<IInstallableUnit> result = queriable.query(QueryUtil.createLatestQuery(query), monitor);
             roots.addAll(result.toUnmodifiableSet());
         }
-        Map<TargetEnvironment, P2ResolutionResult> results = new LinkedHashMap<>();
-        for (TargetEnvironment environment : environments) {
-            results.put(environment, resolveDependencies(roots, null, new ProjectorResolutionStrategy(logger),
-                    environment, targetPlatform, null));
-        }
-        return results;
+        return ParallelEnvironmentResolver.resolve(environments,
+                environment -> resolveDependencies(roots, null, new ProjectorResolutionStrategy(logger), environment,
+                        targetPlatform, null),
+                ParallelEnvironmentResolver.getExecutor());
     }
 
     @Override

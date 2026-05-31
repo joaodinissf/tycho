@@ -12,6 +12,8 @@ package org.eclipse.tycho.p2resolver;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
@@ -63,16 +65,48 @@ final class ParallelEnvironmentResolver {
     }
 
     /**
-     * Resolves each environment via {@code solve} and returns the results keyed by environment, preserving the
-     * iteration order of {@code environments}. NOTE: serial baseline implementation - replaced with a concurrent
-     * implementation in the following commit.
+     * Resolves each environment via {@code solve} concurrently over the given {@code executor} and returns the
+     * results keyed by environment. The returned map preserves the iteration order of {@code environments} (some
+     * downstream code relies on it) regardless of the order in which the individual solves complete. If one or
+     * more solves fail, the first failure is rethrown (unwrapped, as it was when this was a serial loop) once all
+     * solves have settled.
      */
     static <R> Map<TargetEnvironment, R> resolve(List<TargetEnvironment> environments,
             Function<TargetEnvironment, R> solve, Executor executor) {
+        ClassLoader contextClassLoader = Thread.currentThread().getContextClassLoader();
+        List<CompletableFuture<R>> futures = environments.stream()
+                .map(environment -> CompletableFuture
+                        .supplyAsync(() -> solveWithContextClassLoader(environment, solve, contextClassLoader),
+                                executor))
+                .toList();
+        try {
+            CompletableFuture.allOf(futures.toArray(CompletableFuture[]::new)).join();
+        } catch (CompletionException e) {
+            Throwable cause = e.getCause();
+            if (cause instanceof RuntimeException runtimeException) {
+                throw runtimeException;
+            }
+            if (cause instanceof Error error) {
+                throw error;
+            }
+            throw e;
+        }
         Map<TargetEnvironment, R> results = new LinkedHashMap<>();
-        for (TargetEnvironment environment : environments) {
-            results.put(environment, solve.apply(environment));
+        for (int i = 0; i < environments.size(); i++) {
+            results.put(environments.get(i), futures.get(i).join());
         }
         return results;
+    }
+
+    private static <R> R solveWithContextClassLoader(TargetEnvironment environment, Function<TargetEnvironment, R> solve,
+            ClassLoader contextClassLoader) {
+        Thread current = Thread.currentThread();
+        ClassLoader previous = current.getContextClassLoader();
+        current.setContextClassLoader(contextClassLoader);
+        try {
+            return solve.apply(environment);
+        } finally {
+            current.setContextClassLoader(previous);
+        }
     }
 }
