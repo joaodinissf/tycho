@@ -24,8 +24,9 @@
 | `5f032c4a1` | PR3 — opt-in trust of cached qualified artifacts (default off) |
 | `24bc08338` | WIP — PR3 done, ledger update |
 | `1b70c1eea` | WIP — final tally (W1) |
+| `08ade996f` | WIP — pending ideas, ruled-out, #5 scoping |
 
-HEAD = `1b70c1eea`; `origin/feat/parallel-artifact-prefetch` == local HEAD. Working tree clean. No PRs opened.
+HEAD = `08ade996f`; `origin/feat/parallel-artifact-prefetch` == local HEAD. Working tree clean. No PRs opened.
 
 ## Final tally (W1)
 
@@ -171,10 +172,14 @@ trust of cached qualified artifacts). On fork `joaodinissf/tycho`, branch
   `-Dtycho.p2.transport.max-download-threads=1|8`.
 - First test run per fresh setup must be **online** (downloads the surefire JUnit provider) before `-o` works.
 
-## Pending ideas (ranked) — NEXT: tackle #5
+## Pending ideas (ranked) — #5 GATED (see "#5 VALUE-GATE RESULT" below)
 **Live (could build):**
-1. **#5 warm-resolution caching** ⭐ biggest unrealized win (scoping below).
-2. **PR2 reference-DAG extension** — parallelize the repo→repo *reference* recursion (PR2 left it serial); contained, modest.
+1. **#5 Lever B — parallelize per-env SAT loop** ⭐ NEW TOP PICK. Measured ~3 s/multi-env build (cold+warm), contained,
+   PR1/PR2 pattern, no invalidation risk. Candidate **PR4**. (Single-env builds gain nothing.)
+2. **#5 Lever A — cross-invocation SAT-result cache** — bigger warm-rebuild ceiling (~1.7 s) but correctness-critical +
+   invasive → **upstream RFC (W2), not a solo PR.** The original "smallest slice" (persist parsed metadata) is **DROPPED**
+   (gate showed it caches the ~0.3 s parse, not the ~1.4 s SAT → wall-flat).
+3. **PR2 reference-DAG extension** — parallelize the repo→repo *reference* recursion (PR2 left it serial); contained, modest.
 3. **P4 cross-stage re-download** — director/surefire re-provision from remote instead of reusing the mirror.
 4. **P7 cross-process HTTP-cache lock** — #663 half-fixed; `SharedHttpCacheStorage` only intra-JVM `synchronized`.
 5. **P6 revalidation chatter** — after 1h `MIN_CACHE_PERIOD` / header-poor mirrors.
@@ -203,5 +208,32 @@ invalidation. **Cache key is tractable:** repo URLs + on-disk metadata fingerpri
 by the above, *before* attempting to cache the SAT result. Note PR2 already parallelizes the warm metadata *parse*;
 the irreducible warm cost is the single-threaded SAT + that resolution runs at all. **Recommended first step: a
 scoped design proposal, not a speculative big PR.**
+
+### #5 VALUE-GATE RESULT (measured — throwaway probes, reverted; clean core reinstalled)
+Temporary `[PERF#5]` timing probes in `TargetPlatformFactoryImpl.createTargetPlatform` (parse/gather) and
+`P2ResolverImpl.resolveTargetDependencies` (the per-env SAT loop), warm toy build (`~/.m2/p2` populated, no network):
+- **Warm split (1-env toy):** `resolveTargetDefinitions` 0 ms · `gatherExternalInstallableUnits` ~0.25–0.45 s ·
+  **`SAT resolve` ~1.3–1.5 s** (two separate 1-env resolution calls of ~0.5–0.9 s each). → **SAT ≈ 80% of resolution;
+  parse/gather ≈ 20% and PR2 already parallelizes it.**
+- **CONCLUSION — the "smallest viable slice" (persist parsed metadata IU set) caches the WRONG stage.** It would save
+  ~0.3 s warm while leaving the ~1.4 s SAT cost untouched → wall-flat (the PR3 trap, caught before code). **DROP it.**
+
+The SAT cost splits into two very different levers:
+- **Lever A — cache the SAT *result* across invocations.** Reclaims up to the full ~1.7 s (parse+SAT) on a warm
+  rebuild with unchanged inputs. **Correctness-critical + invasive:** key must fingerprint *every* SAT input incl.
+  **mutable reactor IUs** + additional requirements; a missed input → silently-wrong resolution. → **upstream RFC,
+  NOT a speculative solo PR** (= W2). Per-(module×env) keying makes it even harder than first scoped.
+- **Lever B — parallelize the *per-environment* SAT loop** (`P2ResolverImpl.java:115`, and the same loop in
+  `resolveArtifactDependencies` `:149`). The loop runs **one full `Projector` solve per configured environment,
+  serially, for every module**. Independent CPU-bound solves → near-linear speedup up to core count.
+  **Measured prize (4-env warm toy):** `SAT resolve (4 env)` = **2428 ms** and **1862 ms** (the two calls) — i.e.
+  **~4.3 s of a 9.7 s build (~45%)**, scaling ~0.5–0.6 s/env. Parallelizing reclaims ~¾ → **~3 s per multi-env build,
+  cold AND warm.** Same proven pattern as PR1/PR2 (bounded fan-out + TCCL + integration test), **no
+  invalidation-correctness risk** — only `usedTargetPlatformUnits` merge needs care (`usedShadowedUnits` already
+  `CopyOnWriteSet`); must prove the copied-from-p2 `Projector`/`Slicer` is concurrency-safe (PR2-style IT).
+  **Caveat:** zero benefit for single-env builds (most plugin modules; the toy is why baseline showed two 1-env solves).
+
+**RECOMMENDATION (measurement-driven): build Lever B as PR4 (contained, broad, low-risk), draft Lever A as W2 RFC,
+do not build A. Awaiting user's pick (B / A-RFC / both / close).**
 
 Update the "Branch state" table after each commit.
