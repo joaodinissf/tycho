@@ -22,8 +22,10 @@
 | `30c597ae7` | WIP status doc |
 | `15ed5ba21` | WIP — full steps ledger |
 | `5f032c4a1` | PR3 — opt-in trust of cached qualified artifacts (default off) |
+| `24bc08338` | WIP — PR3 done, ledger update |
+| `1b70c1eea` | WIP — final tally (W1) |
 
-`origin/feat/parallel-artifact-prefetch` == local HEAD. No PRs opened.
+HEAD = `1b70c1eea`; `origin/feat/parallel-artifact-prefetch` == local HEAD. Working tree clean. No PRs opened.
 
 ## Final tally (W1)
 
@@ -117,12 +119,18 @@ trust of cached qualified artifacts). On fork `joaodinissf/tycho`, branch
   (6 concurrent loads vs **real** Equinox manager → thread-safety proven).
 - Gates: unit 3/3 + integration 1/1; full `tycho-core` 610/0/0.
 
-### ⏳ PR3 — Opportunistic content-hash (SHA-256) dedup across keys (P5) — PENDING
-- Idea: before downloading a key, consult a sha-256→file content index (sha-256 already in p2 index,
-  read at `MirroringArtifactProvider.fileMatchesProperties:286-289`); on hit link/copy instead of download.
-  **Opportunistic** — only when descriptor publishes sha-256; else today's path.
-- RED tests: `sameContentTwoClassifiersDownloadedOnce`, `missingChecksumFallsBackToNormalDownload`.
-- Riskiest of the three; do last. **Open question:** value may be modest (already-deduped bytes) — re-assess before building.
+### ✅ PR3 — Opt-in trust of cached qualified artifacts (P5) — DONE (`5f032c4a1`)
+- Phase-0 killed the original content-store idea: cross-key SHA dedup = **0/2920**; same-key-different-SHA
+  = **72**, all re-sign/timestamp (never code — e.g. hamcrest differs only in `META-INF/*.SF/*.RSA`,
+  source bundles only in zip timestamps).
+- Shipped instead: `MirroringArtifactProvider.hasQualifier(key)` + a guard in `isFileAlreadyAvailable`'s
+  property-drift branch — a locally-cached artifact with a *qualified* version (immutable by contract) is
+  trusted despite metadata drift, skipping the re-download. **Opt-in** flag
+  `tycho.p2.transport.trust-cached-qualified-artifacts` (**default false**); non-qualified versions stay
+  conservative; `ChecksumPolicy.STRICT` unaffected (handled separately above the guard).
+- Tests: `MirroringArtifactProviderQualifierTest` (2). A/B: re-downloads 98→20 but **wall flat** even
+  through a 0.25 s/conn proxy (HTTP keep-alive amortizes per-connection cost) → kept as a *bandwidth* saver,
+  not a perf win, hence default-off.
 
 ## Benchmarks / validation (empirical)
 - **PR1 synthetic** (40 real Eclipse bundles, warm CDN, harness `/Users/joao/Git/tycho-bench/DownloadBench.java`):
@@ -163,6 +171,37 @@ trust of cached qualified artifacts). On fork `joaodinissf/tycho`, branch
   `-Dtycho.p2.transport.max-download-threads=1|8`.
 - First test run per fresh setup must be **online** (downloads the surefire JUnit provider) before `-o` works.
 
-## Next decision
-PR3, or wrap-up/summary. Optionally draft the #5 upstream design proposal while fresh. Update this file
-and the "Branch state" table after each commit.
+## Pending ideas (ranked) — NEXT: tackle #5
+**Live (could build):**
+1. **#5 warm-resolution caching** ⭐ biggest unrealized win (scoping below).
+2. **PR2 reference-DAG extension** — parallelize the repo→repo *reference* recursion (PR2 left it serial); contained, modest.
+3. **P4 cross-stage re-download** — director/surefire re-provision from remote instead of reusing the mirror.
+4. **P7 cross-process HTTP-cache lock** — #663 half-fixed; `SharedHttpCacheStorage` only intra-JVM `synchronized`.
+5. **P6 revalidation chatter** — after 1h `MIN_CACHE_PERIOD` / header-poor mirrors.
+6. **#4 Eclipse/PDE shared p2 loader** — strategic, big.
+
+**Ruled out (measured/analyzed — do NOT revisit):** coalescing `DownloadManager` (per-key lock already dedups
+bytes); content-addressable SHA store / cross-key dedup (0 occurrences); "download candidates in parallel +
+dedupe" (one artifact per resolved key — racing is wasteful); content-normalized "zip-hash" to avoid downloads
+(remote publishes only the byte-SHA → can't know content-equality without downloading both; the real fix is
+reproducible source jars upstream).
+
+## #5 scoping (for cold resume) — cache/persist target-platform resolution across invocations
+**Problem:** warm builds re-run resolution every time (~2.8 s of a 3.6 s warm build = re-parse cached metadata
++ Slicer + SAT solve), recomputed because the resolution RESULT is never persisted. Downloads = 0 when warm.
+**Where computed/held (all in-memory, per Maven invocation):**
+- `TargetPlatformFactoryImpl.createTargetPlatform` → `gatherExternalInstallableUnits` → `PreliminaryTargetPlatformImpl` (external IU set).
+- `P2ResolverImpl.resolveTargetDependencies` → `ProjectorResolutionStrategy` (per-environment SAT result), stored via `DefaultTargetPlatformService` on the `MavenProject` context.
+**Existing caches & scope:** `TargetDefinitionResolverService.resolutionCache` (ConcurrentMap, **in-session only**);
+p2 metadata manager + `LocalArtifactRepository` (in-memory per invocation); `SharedHttpCacheStorage` + `~/.m2/p2`
+(disk, cross-invocation, but **bytes only** — not parsed IUs or the SAT result).
+**Feasibility = (B) achievable but invasive.** Blockers: `IInstallableUnit` not `Serializable` (persisting needs
+the full requirement/capability model ≈ a fast-load `content.xml`); SAT re-runs; mutable reactor state ⇒ hard
+invalidation. **Cache key is tractable:** repo URLs + on-disk metadata fingerprints (no extra network within 1h)
++ target-file content + environments + EE + filters. Prior art: bug 533747 (in-session only), issue #496 (cache-key instability).
+**Smallest viable slice:** persist the parsed metadata IU set (TargetDefinitionContent) across invocations keyed
+by the above, *before* attempting to cache the SAT result. Note PR2 already parallelizes the warm metadata *parse*;
+the irreducible warm cost is the single-threaded SAT + that resolution runs at all. **Recommended first step: a
+scoped design proposal, not a speculative big PR.**
+
+Update the "Branch state" table after each commit.
