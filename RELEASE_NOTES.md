@@ -12,6 +12,8 @@ Artifacts that have to be fetched while assembling a project's build target plat
 
 When a target platform is backed by several p2 repositories, their metadata (the `content`/`artifacts` indices) is now loaded concurrently rather than one repository after another, which reduces the time spent in the initial dependency resolution. The loading order, deduplication and repository-reference handling are unchanged; only the up-front loading of the configured repositories overlaps.
 
+A new opt-in system property `tycho.p2.transport.trust-cached-qualified-artifacts` (default `false`) avoids re-downloading an already-cached artifact when its version carries an OSGi qualifier (immutable by contract) and only the remote's published metadata has drifted — e.g. the same code re-signed or re-zipped in a later release. It reduces redundant downloads; it is not enabled by default and has no effect in strict checksum mode (which continues to verify bytes). See [System Properties](SystemProperties.md).
+
 ### new `tycho-p2-extras:p2-manager` mojo for managing P2 update sites
 
 The new `tycho-p2-extras:p2-manager` goal provides a convenient way to maintain, update, and manage the integrity of public update sites. This mojo wraps the [P2 Manager application from JustJ Tools](https://eclipse.dev/justj/?page=tools) and makes it much easier to use compared to the previous approach using the eclipse-run goal.

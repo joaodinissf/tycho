@@ -65,6 +65,7 @@ tycho.p2.transport.cache | file path | local maven repository | Specify the loca
 tycho.p2.transport.debug | true/false | false | enable debugging of the Tycho Transport
 tycho.p2.transport.max-download-threads | number | 8 | maximum number of threads used to download artifacts in parallel. Downloading is network-latency bound, so a value above the CPU count is reasonable; the default is kept modest to stay friendly to mirrors that rate-limit. Increase it on fast, robust infrastructure.
 tycho.p2.transport.min-cache-minutes | number | 60 | Number of minutes that a cache entry is assumed to be fresh and is not fetched again from the server. Use `-U` on the command line to force an immediate refresh regardless of this setting.
+tycho.p2.transport.trust-cached-qualified-artifacts | true/false | false | Opt-in. When enabled, an already-cached artifact whose version carries an OSGi qualifier (immutable by contract) is not re-downloaded when only the remote's published metadata (e.g. the checksum after a re-sign or re-zip of identical content) has changed. Saves redundant data transfer; has no effect in strict checksum mode.
 tycho.p2.transport.bundlepools.priority | number | 100 | priority used for bundle pools
 tycho.p2.transport.bundlepools.shared | true/false | true | query shared bundle pools for artifacts before downloading them from remote servers
 tycho.p2.transport.bundlepools.workspace | true/false | true | query Workspace bundle pools for artifacts before downloading them from remote servers

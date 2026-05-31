@@ -78,6 +78,18 @@ public class MirroringArtifactProvider implements IRawArtifactFileProvider {
     protected final MavenLogger logger;
     protected final MavenLogger splittingLogger;
 
+    /**
+     * Opt-in (default {@code false}): when enabled, a locally-cached artifact whose version carries
+     * an OSGi qualifier is trusted even if the remote's published metadata (e.g. the checksum) has
+     * drifted, avoiding the re-download of content that is immutable by contract (a re-signed or
+     * re-zipped copy of the same code). This saves redundant data transfer; it does not measurably
+     * reduce build time, because connection reuse already amortizes per-connection overhead. Enable
+     * with {@code -Dtycho.p2.transport.trust-cached-qualified-artifacts=true}. Has no effect in
+     * {@link ChecksumPolicy#STRICT} mode (strict byte verification is handled separately above).
+     */
+    private static final boolean TRUST_CACHED_QUALIFIED = Boolean
+            .parseBoolean(System.getProperty("tycho.p2.transport.trust-cached-qualified-artifacts", "false"));
+
     protected final IRawArtifactProvider remoteProviders;
     protected final LocalArtifactRepository localArtifactRepository;
 
@@ -371,6 +383,22 @@ public class MirroringArtifactProvider implements IRawArtifactFileProvider {
         return null;
     }
 
+    /**
+     * A fully-qualified OSGi version (major.minor.micro.qualifier) is immutable by contract: real
+     * content changes must bump the qualifier. So a locally-cached artifact with a qualified version
+     * may be trusted even if the remote's published metadata (e.g. the checksum after a re-sign or
+     * re-zip) has drifted. Non-qualified versions carry no such guarantee and are treated
+     * conservatively (re-downloaded).
+     */
+    static boolean hasQualifier(IArtifactKey key) {
+        try {
+            return !org.osgi.framework.Version.parseVersion(key.getVersion().toString()).getQualifier().isEmpty();
+        } catch (RuntimeException e) {
+            // not an OSGi version -> stay conservative
+            return false;
+        }
+    }
+
     private static IStatus artifactNotFoundStatus(IArtifactKey key) {
         return new Status(IStatus.ERROR, BUNDLE_ID, ProvisionException.ARTIFACT_NOT_FOUND, "Artifact " + key
                 + " is neither available in the local Maven repository nor in the configured remote repositories",
@@ -471,6 +499,16 @@ public class MirroringArtifactProvider implements IRawArtifactFileProvider {
                                 logger.info(
                                         "\t" + key + " diverged, remote = " + remoteValue + ", local = " + localValue);
                             }
+                        }
+                        if (TRUST_CACHED_QUALIFIED && hasQualifier(artifactKey)) {
+                            // A qualified version is immutable by contract, so the drift is a re-sign
+                            // or re-zip of identical content; keep the local copy instead of
+                            // re-downloading. (Disable with
+                            // -Dtycho.p2.transport.trust-cached-qualified-artifacts=false; STRICT
+                            // checksum mode is unaffected and is handled above.)
+                            logger.debug("Keeping locally cached " + artifactKey
+                                    + " despite p2 metadata drift (qualified version is immutable by contract)");
+                            return true;
                         }
                         return false;
                     }
