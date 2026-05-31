@@ -12,6 +12,10 @@ Artifacts that have to be fetched while assembling a project's build target plat
 
 When a target platform is backed by several p2 repositories, their metadata (the `content`/`artifacts` indices) is now loaded concurrently rather than one repository after another, which reduces the time spent in the initial dependency resolution. The loading order, deduplication and repository-reference handling are unchanged; only the up-front loading of the configured repositories overlaps.
 
+### Parallel resolution of multiple target environments
+
+When a project is configured for several target environments (for example a product, feature or update site built for multiple `os`/`ws`/`arch` combinations), the dependency resolution for each environment is now computed concurrently over a bounded, CPU-sized thread pool instead of one environment after another. Each environment is solved independently, so for multi-environment builds this noticeably reduces resolution time (the dominant cost of a warm build). The resolved result for each environment is unchanged and the result order is preserved. The pool size is controlled by the new `tycho.p2.resolver.max-threads` system property (default: the number of available processors); set it to `1` to restore the previous serial behavior. Single-environment projects are unaffected. See [System Properties](SystemProperties.md).
+
 A new opt-in system property `tycho.p2.transport.trust-cached-qualified-artifacts` (default `false`) avoids re-downloading an already-cached artifact when its version carries an OSGi qualifier (immutable by contract) and only the remote's published metadata has drifted — e.g. the same code re-signed or re-zipped in a later release. It reduces redundant downloads; it is not enabled by default and has no effect in strict checksum mode (which continues to verify bytes). See [System Properties](SystemProperties.md).
 
 ### new `tycho-p2-extras:p2-manager` mojo for managing P2 update sites
