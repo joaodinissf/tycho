@@ -115,6 +115,7 @@ import org.eclipse.tycho.p2.target.facade.TargetPlatformConfigurationStub;
 import org.eclipse.tycho.p2.target.facade.TargetPlatformFactory;
 import org.eclipse.tycho.p2maven.ListCompositeArtifactRepository;
 import org.eclipse.tycho.p2maven.advices.MavenPropertiesAdvice;
+import org.eclipse.tycho.p2maven.transport.TychoRepositoryTransport;
 import org.eclipse.tycho.p2tools.copiedfromp2.QueryableArray;
 import org.eclipse.tycho.targetplatform.P2TargetPlatform;
 import org.eclipse.tycho.targetplatform.TargetDefinition;
@@ -424,6 +425,10 @@ public class TargetPlatformFactoryImpl implements TargetPlatformFactory {
 
         List<IMetadataRepository> metadataRepositories = new ArrayList<>();
         Set<URI> loaded = new HashSet<>();
+        // Pre-warm the top-level repositories concurrently so their metadata downloads in parallel; the
+        // sequential walk below then reads each from the p2 manager's cache, keeping its original order.
+        MetadataRepositoryPrewarmer.prewarm(completeRepositories, remoteMetadataRepositoryManager,
+                TychoRepositoryTransport.getDownloadExecutor());
         for (MavenRepositoryLocation location : completeRepositories) {
             artifactRepositories.put(location.getURL(), false);
             try {

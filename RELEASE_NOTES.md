@@ -6,6 +6,10 @@ If you are reading this in the browser, then you can quickly jump to specific ve
 
 ## 6.0.0 (under development)
 
+### Parallel loading of p2 repository metadata during dependency resolution
+
+When a target platform is backed by several p2 repositories, their metadata (the `content`/`artifacts` indices) is now loaded concurrently rather than one repository after another, which reduces the time spent in the initial dependency resolution. The loading order, deduplication and repository-reference handling are unchanged; only the up-front loading of the configured repositories overlaps.
+
 ### new `tycho-p2-extras:p2-manager` mojo for managing P2 update sites
 
 The new `tycho-p2-extras:p2-manager` goal provides a convenient way to maintain, update, and manage the integrity of public update sites. This mojo wraps the [P2 Manager application from JustJ Tools](https://eclipse.dev/justj/?page=tools) and makes it much easier to use compared to the previous approach using the eclipse-run goal.
