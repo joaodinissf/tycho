@@ -19,7 +19,9 @@
 | `a4e5bb52a` | PR1 — parallelize artifact prefetch |
 | `6591062e8` | PR2 — parallel metadata-repository loading |
 | `e510e94ac` | PR2 — integration test vs real p2 manager |
-| _(this file)_ | WIP status doc |
+| `30c597ae7` | WIP status doc |
+| `15ed5ba21` | WIP — full steps ledger |
+| `5f032c4a1` | PR3 — opt-in trust of cached qualified artifacts (default off) |
 
 `origin/feat/parallel-artifact-prefetch` == local HEAD. No PRs opened.
 
@@ -46,11 +48,11 @@
 | Bench | B2 | PR1 real cold A/B 120→25s (~4.8×) | ✅ Done | |
 | Bench | B3 | PR2 real cold A/B 62→20s (~3.1×) | ✅ Done | |
 | Bench | B4 | Warm-build profiling (~2.8s re-resolution) | ✅ Done | → #5 |
-| PR3 | 3a | Re-confirm PR3 value (bytes largely deduped) | ⏳ Todo | gate before building |
-| PR3 | 3b | RED tests (sameContentTwoClassifiers…, missingChecksum…) | ⏳ Todo | |
-| PR3 | 3c | GREEN sha-256 content index in `makeOneFormatLocallyAvailable` | ⏳ Todo | |
-| PR3 | 3d | Docs + full-suite gate | ⏳ Todo | |
-| PR3 | 3e | Commit (signed) + push | ⏳ Todo | |
+| PR3 | 3a | Phase-0 value gate (metadata analysis: cross-key dedup=0; 72 same-key byte-drift = re-sign/timestamps, never code) | ✅ Done | content-store dropped; pivoted to qualified-trust |
+| PR3 | 3b | RED `MirroringArtifactProviderQualifierTest.hasQualifier` | ✅ Done | qualified vs non-qualified |
+| PR3 | 3c | GREEN `hasQualifier` + guard in `isFileAlreadyAvailable`; opt-in flag default **off** | ✅ Done | STRICT carve-out |
+| PR3 | 3d | Docs (`SystemProperties.md`, `RELEASE_NOTES.md`) + full suite 613/0/0 | ✅ Done | |
+| PR3 | 3e | A/B: re-downloads 98→20; **wall flat** (warm CDN & 0.25s/conn proxy — keep-alive amortizes) → kept **opt-in default-off** bandwidth saver | ✅ Done | `5f032c4a1` |
 | Wrap | W1 | Final stack summary | ⏳ Todo | |
 | Wrap | W2 | Draft #5 upstream design proposal | ⏳ Todo (optional) | |
 | Wrap | W3 | Remove this WIP doc before opening any PR | ⏳ Todo (at completion) | |
