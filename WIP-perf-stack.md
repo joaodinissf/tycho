@@ -23,6 +23,43 @@
 
 `origin/feat/parallel-artifact-prefetch` == local HEAD. No PRs opened.
 
+## Steps ledger (all — done / todo / deferred)
+| Phase | # | Step | Status | Notes |
+|---|---|---|---|---|
+| Setup | S1 | Clone `eclipse-tycho/tycho` | ✅ Done | |
+| Setup | S2 | Workflow team #1 — serial-resolution investigation | ✅ Done | dead `DOWNLOAD_EXECUTOR` |
+| Setup | S3 | Workflow team #2 — re-download root-cause | ✅ Done | #651 reframed |
+| Setup | S4 | Plan approved; fork + remotes wired | ✅ Done | origin=fork |
+| Setup | S5 | WIP status doc committed | ✅ Done | `30c597ae7` |
+| PR1 | 1a | RED `ArtifactPrefetcherTest` (teeth) | ✅ Done | 3 tests |
+| PR1 | 1b | GREEN `ArtifactPrefetcher` + wire `RepositoryReferenceTool` | ✅ Done | |
+| PR1 | 1c | Default 4→8 + docs | ✅ Done | |
+| PR1 | 1d | Gates: unit 3/3, full 607/0/0 | ✅ Done | |
+| PR1 | 1e | Commit (signed) + push | ✅ Done | `a4e5bb52a` |
+| PR2 | 2a | RED `MetadataRepositoryPrewarmerTest` (teeth) | ✅ Done | 3 tests |
+| PR2 | 2b | GREEN prewarmer + wire `gatherExternalInstallableUnits` | ✅ Done | walk byte-identical |
+| PR2 | 2c | Docs (`RELEASE_NOTES`) | ✅ Done | |
+| PR2 | 2d | Gate: full 610/0/0 | ✅ Done | |
+| PR2 | 2e | Commit (signed) + push | ✅ Done | `6591062e8` |
+| PR2 | 2f | Integration test vs real p2 manager | ✅ Done | `e510e94ac` |
+| Bench | B1 | PR1 synthetic sweep (~4×) | ✅ Done | 8 = sweet spot |
+| Bench | B2 | PR1 real cold A/B 120→25s (~4.8×) | ✅ Done | |
+| Bench | B3 | PR2 real cold A/B 62→20s (~3.1×) | ✅ Done | |
+| Bench | B4 | Warm-build profiling (~2.8s re-resolution) | ✅ Done | → #5 |
+| PR3 | 3a | Re-confirm PR3 value (bytes largely deduped) | ⏳ Todo | gate before building |
+| PR3 | 3b | RED tests (sameContentTwoClassifiers…, missingChecksum…) | ⏳ Todo | |
+| PR3 | 3c | GREEN sha-256 content index in `makeOneFormatLocallyAvailable` | ⏳ Todo | |
+| PR3 | 3d | Docs + full-suite gate | ⏳ Todo | |
+| PR3 | 3e | Commit (signed) + push | ⏳ Todo | |
+| Wrap | W1 | Final stack summary | ⏳ Todo | |
+| Wrap | W2 | Draft #5 upstream design proposal | ⏳ Todo (optional) | |
+| Wrap | W3 | Remove this WIP doc before opening any PR | ⏳ Todo (at completion) | |
+| Defer | #4 | Eclipse/PDE upstreaming + shared p2 loader | ⏸️ Deferred | |
+| Defer | #5 | Warm-resolution caching (feasibility B, invasive) | ⏸️ Deferred | |
+| Defer | P4 | Cross-stage re-download (director/surefire) | ⏸️ Deferred | |
+| Defer | P6 | HTTP revalidation after 1h / header-poor mirrors | ⏸️ Deferred | |
+| Defer | P7 | Cross-process HTTP-cache lock (#663 half-fixed) | ⏸️ Deferred | |
+
 ## Confirmed problems (evidence)
 | # | Problem | Evidence | Status |
 |---|---|---|---|
