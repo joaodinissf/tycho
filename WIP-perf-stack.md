@@ -25,8 +25,13 @@
 | `24bc08338` | WIP — PR3 done, ledger update |
 | `1b70c1eea` | WIP — final tally (W1) |
 | `08ade996f` | WIP — pending ideas, ruled-out, #5 scoping |
+| `22fd39b6f` | WIP — #5 value-gate result (SAT dominates; B>A) |
+| `c2eec75fc` | PR4 RED — failing tests for parallel per-env resolution |
+| `93046d168` | PR4 GREEN — concurrent per-env resolution + integration test |
+| `7abb68958` | PR4 DOCS — tycho.p2.resolver.max-threads + release note |
+| `d57acbedc` | RFC — cross-invocation SAT-result cache (Lever A, draft) |
 
-HEAD = `08ade996f`; `origin/feat/parallel-artifact-prefetch` == local HEAD. Working tree clean. No PRs opened.
+HEAD = (this WIP commit); branch pushed to fork after this commit. Working tree clean. No PRs opened.
 
 ## Final tally (W1)
 
@@ -79,7 +84,14 @@ trust of cached qualified artifacts). On fork `joaodinissf/tycho`, branch
 | PR3 | 3d | Docs (`SystemProperties.md`, `RELEASE_NOTES.md`) + full suite 613/0/0 | ✅ Done | |
 | PR3 | 3e | A/B: re-downloads 98→20; **wall flat** (warm CDN & 0.25s/conn proxy — keep-alive amortizes) → kept **opt-in default-off** bandwidth saver | ✅ Done | `5f032c4a1` |
 | Wrap | W1 | Final stack summary / tally (both methods ~2.4–2.6× cold) | ✅ Done | see "Final tally" |
-| Wrap | W2 | Draft #5 upstream design proposal | ⏳ Todo (optional) | |
+| #5gate | G1 | Value-gate: warm split parse ~0.3s vs SAT ~1.4s; 4-env SAT 2428+1862ms | ✅ Done | `22fd39b6f`; smallest-slice dropped, B>A |
+| PR4 | 4a | RED `ParallelEnvironmentResolverTest` (teeth) + executor test | ✅ Done | `c2eec75fc`; runsConcurrently fails serial |
+| PR4 | 4b | GREEN `ParallelEnvironmentResolver` + wire both `P2ResolverImpl` loops | ✅ Done | `93046d168`; TCCL, order-preserving, synchronized union set |
+| PR4 | 4c | Integration test (3-env, real solver, 8 iters, deterministic) | ✅ Done | `93046d168` |
+| PR4 | 4d | Gate: PR4 unit 9/9; full `tycho-core` 622/0/0 | ✅ Done | no regressions |
+| PR4 | 4e | DOCS (`SystemProperties.md` resolver section + `RELEASE_NOTES`) | ✅ Done | `7abb68958` |
+| PR4 | 4f | End-to-end 4-env A/B (max-threads=1 vs default) | ⏳ Todo | wall-clock number for the win |
+| Wrap | W2 | Lever-A RFC draft (`RFC-warm-resolution-caching.md`) | ✅ Done | `d57acbedc` |
 | Wrap | W3 | Remove this WIP doc before opening any PR | ⏳ Todo (at completion) | |
 | Defer | #4 | Eclipse/PDE upstreaming + shared p2 loader | ⏸️ Deferred | |
 | Defer | #5 | Warm-resolution caching (feasibility B, invasive) | ⏸️ Deferred | |
@@ -172,14 +184,16 @@ trust of cached qualified artifacts). On fork `joaodinissf/tycho`, branch
   `-Dtycho.p2.transport.max-download-threads=1|8`.
 - First test run per fresh setup must be **online** (downloads the surefire JUnit provider) before `-o` works.
 
-## Pending ideas (ranked) — #5 GATED (see "#5 VALUE-GATE RESULT" below)
-**Live (could build):**
-1. **#5 Lever B — parallelize per-env SAT loop** ⭐ NEW TOP PICK. Measured ~3 s/multi-env build (cold+warm), contained,
-   PR1/PR2 pattern, no invalidation risk. Candidate **PR4**. (Single-env builds gain nothing.)
-2. **#5 Lever A — cross-invocation SAT-result cache** — bigger warm-rebuild ceiling (~1.7 s) but correctness-critical +
-   invasive → **upstream RFC (W2), not a solo PR.** The original "smallest slice" (persist parsed metadata) is **DROPPED**
-   (gate showed it caches the ~0.3 s parse, not the ~1.4 s SAT → wall-flat).
-3. **PR2 reference-DAG extension** — parallelize the repo→repo *reference* recursion (PR2 left it serial); contained, modest.
+## Pending ideas (ranked) — #5 RESOLVED (B shipped as PR4, A drafted as RFC)
+**Done:**
+- ✅ **#5 Lever B — parallelize per-env SAT loop** → shipped as **PR4** (`c2eec75fc`/`93046d168`/`7abb68958`). Measured
+  4-env SAT 2428+1862 ms serial; concurrent + deterministic (8-iter IT). Single-env builds unaffected.
+- ✅ **#5 Lever A — cross-invocation SAT-result cache** → drafted as RFC `d57acbedc` (`RFC-warm-resolution-caching.md`),
+  **not built** (correctness-critical/invasive; upstream design discussion). Original "smallest slice" (persist parsed
+  metadata) **DROPPED** by the gate (caches the ~0.3 s parse, not the ~1.4 s SAT → wall-flat).
+
+**Still live (could build):**
+1. **PR2 reference-DAG extension** — parallelize the repo→repo *reference* recursion (PR2 left it serial); contained, modest.
 3. **P4 cross-stage re-download** — director/surefire re-provision from remote instead of reusing the mirror.
 4. **P7 cross-process HTTP-cache lock** — #663 half-fixed; `SharedHttpCacheStorage` only intra-JVM `synchronized`.
 5. **P6 revalidation chatter** — after 1h `MIN_CACHE_PERIOD` / header-poor mirrors.
