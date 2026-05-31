@@ -90,7 +90,7 @@ trust of cached qualified artifacts). On fork `joaodinissf/tycho`, branch
 | PR4 | 4c | Integration test (3-env, real solver, 8 iters, deterministic) | ✅ Done | `93046d168` |
 | PR4 | 4d | Gate: PR4 unit 9/9; full `tycho-core` 622/0/0 | ✅ Done | no regressions |
 | PR4 | 4e | DOCS (`SystemProperties.md` resolver section + `RELEASE_NOTES`) | ✅ Done | `7abb68958` |
-| PR4 | 4f | End-to-end 4-env A/B (max-threads=1 vs default) | ⏳ Todo | wall-clock number for the win |
+| PR4 | 4f | End-to-end 4-env A/B (max-threads=1 vs default) | ✅ Done | warm Maven total 9.38s→7.51s (**~1.9s / ~20%**); scales w/ env count + TP size |
 | Wrap | W2 | Lever-A RFC draft (`RFC-warm-resolution-caching.md`) | ✅ Done | `d57acbedc` |
 | Wrap | W3 | Remove this WIP doc before opening any PR | ⏳ Todo (at completion) | |
 | Defer | #4 | Eclipse/PDE upstreaming + shared p2 loader | ⏸️ Deferred | |
