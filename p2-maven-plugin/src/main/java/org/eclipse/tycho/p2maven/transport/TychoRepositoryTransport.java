@@ -58,7 +58,7 @@ import org.eclipse.tycho.transport.TransportProtocolHandler;
 public class TychoRepositoryTransport extends org.eclipse.equinox.internal.p2.repository.Transport
 		implements IAgentServiceFactory {
 
-	private static final int MAX_DOWNLOAD_THREADS = Integer.getInteger("tycho.p2.transport.max-download-threads", 4);
+	private static final int MAX_DOWNLOAD_THREADS = Integer.getInteger("tycho.p2.transport.max-download-threads", 8);
 
 	private static final Executor DOWNLOAD_EXECUTOR = Executors.newFixedThreadPool(MAX_DOWNLOAD_THREADS,
 			new ThreadFactory() {
