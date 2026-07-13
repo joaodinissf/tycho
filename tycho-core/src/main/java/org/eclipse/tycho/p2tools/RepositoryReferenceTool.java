@@ -67,6 +67,9 @@ public class RepositoryReferenceTool {
     @Requirement
     private ReactorRepositoryManager repositoryManager;
 
+    @Requirement
+    private ArtifactPrefetcher artifactPrefetcher;
+
     /**
      * Returns the list of visible p2 repositories for the build of the current module. The list
      * includes the p2 repositories of the referenced reactor modules, the target platform, and
@@ -135,7 +138,7 @@ public class RepositoryReferenceTool {
 
                 DependencyArtifacts dependencyArtifacts = dependencyResolver.resolveDependencies(session, project,
                         targetPlatform, resolverConfiguration, configuration.getEnvironments());
-                dependencyArtifacts.getArtifacts().forEach(artifact -> artifact.getLocation(true)); // ensure artifacts are available locally
+                artifactPrefetcher.prefetch(dependencyArtifacts.getArtifacts()); // ensure artifacts are available locally (fetched in parallel)
 
                 // this contains dependency-only metadata for 'this' project
                 Set<IInstallableUnit> targetPlatformInstallableUnits = new HashSet<>(
